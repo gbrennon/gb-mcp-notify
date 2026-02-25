@@ -6,11 +6,20 @@
 
 ## Architecture
 
-- **`src/gb_mcp_notify/__init__.py`** — all server logic lives here: the `FastMCP` instance, `_send()` helper, `notify` tool, and `main()` entry point that calls `mcp.run(transport="stdio")`.
-- **`server.py`** — thin backward-compatibility shim that imports and calls `main()`. Existing MCP configs pointing at this file still work, but prefer the package entry point.
-- **`pyproject.toml`** — declares `gb-mcp-notify = "gb_mcp_notify:main"` as the console script.
+```
+src/gb_mcp_notify/
+├── __init__.py     # Package initializer — re-exports main()
+├── server.py       # FastMCP instance, @mcp.tool() notify, main()
+└── _notifier.py    # send() helper — subprocess/notify-send concern
+server.py           # Backward-compat shim → calls main()
+```
 
-When adding new MCP tools, add them in `src/gb_mcp_notify/__init__.py` using the `@mcp.tool()` decorator.
+- **`_notifier.py`** owns the subprocess interaction with `notify-send`. No MCP dependency.
+- **`server.py`** owns the MCP layer: tool registration and `mcp.run()`. Imports `send` from `_notifier`.
+- **`__init__.py`** only re-exports `main` for the console script entry point.
+- **`server.py` (root)** is a thin shim kept for existing MCP configs that point at it directly.
+
+When adding new MCP tools, add them in `src/gb_mcp_notify/server.py`. Add new system-level helpers in `src/gb_mcp_notify/_notifier.py` or a new `_<concern>.py` module.
 
 ## Build & Run
 
@@ -32,9 +41,9 @@ uv tool upgrade gb-mcp-notify
 
 ## Key Conventions
 
-- **`notify-send` is a hard runtime dependency** — `_send()` raises `RuntimeError` if it isn't in `PATH`. Tests or environments without it must mock `shutil.which` and `subprocess.run`.
+- **`notify-send` is a hard runtime dependency** — `send()` in `_notifier.py` raises `RuntimeError` if it isn't in `PATH`. Tests must mock `shutil.which` and `subprocess.run`.
 - **Urgency values are validated** against `{"low", "normal", "critical"}` — `ValueError` for invalid urgency, `RuntimeError` for `notify-send` failures.
-- **`src/gb_mcp_notify/__init__.py` is intentionally flat** — keep new tools in the same file unless it grows significantly.
+- **Private helpers are prefixed with `_`** (e.g., `_notifier.py`) — they are internal to the package.
 - Python `>=3.14` is required (see `.python-version` and `pyproject.toml`).
 
 ## MCP Client Configuration
