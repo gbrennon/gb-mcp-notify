@@ -42,7 +42,7 @@ Point MCP clients at `server.py` with `python3` as the command and `stdio` trans
 ```json
 {
   "command": "python3",
-  "args": ["/path/to/gb-mcp-notify/server.py"]
+  "args": ["./server.py"]
 }
 ```
 
