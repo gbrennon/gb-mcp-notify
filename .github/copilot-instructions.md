@@ -6,44 +6,58 @@
 
 ## Architecture
 
-The project has a split structure:
+```
+src/gb_mcp_notify/
+├── __init__.py     # Package initializer — re-exports main()
+├── server.py       # FastMCP instance, @mcp.tool() notify, main()
+└── _notifier.py    # send() helper — subprocess/notify-send concern
+server.py           # Backward-compat shim → calls main()
+```
 
-- **`server.py`** — the runnable MCP server. This is the file to point MCP clients at. It uses `FastMCP` from the `mcp` SDK, registers the `notify` tool, and runs with `transport="stdio"`.
-- **`src/gb_mcp_notify/__init__.py`** — the installable Python package entry point (currently a stub `main()`). The `pyproject.toml` `[project.scripts]` entry points here, not to `server.py`.
+- **`_notifier.py`** owns the subprocess interaction with `notify-send`. No MCP dependency.
+- **`server.py`** owns the MCP layer: tool registration and `mcp.run()`. Imports `send` from `_notifier`.
+- **`__init__.py`** only re-exports `main` for the console script entry point.
+- **`server.py` (root)** is a thin shim kept for existing MCP configs that point at it directly.
 
-When extending functionality, add new MCP tools in `server.py` using the `@mcp.tool()` decorator pattern. The `_send()` helper is internal and not exposed as a tool.
+When adding new MCP tools, add them in `src/gb_mcp_notify/server.py`. Add new system-level helpers in `src/gb_mcp_notify/_notifier.py` or a new `_<concern>.py` module.
 
 ## Build & Run
 
-This project uses [uv](https://docs.astral.sh/uv/) exclusively (no pip/poetry):
+This project uses [uv](https://docs.astral.sh/uv/) exclusively:
 
 ```bash
 # Install dependencies
 uv sync
 
-# Run the MCP server directly (stdio transport)
-python server.py
-
-# Or via installed script
+# Run without installing
 uv run gb-mcp-notify
+
+# Install as a system tool (adds gb-mcp-notify to PATH)
+uv tool install .
+
+# Upgrade after code changes
+uv tool upgrade gb-mcp-notify
 ```
 
 ## Key Conventions
 
-- **`notify-send` is a hard runtime dependency** — `_send()` raises `RuntimeError` if it isn't in `PATH`. Tests or environments without it must mock `shutil.which` and `subprocess.run`.
-- **Urgency values are validated** against the set `{"low", "normal", "critical"}` — use `ValueError` for invalid values, `RuntimeError` for `notify-send` failures.
-- **`server.py` is intentionally flat** — no sub-modules. Keep new tools in the same file unless the file grows significantly.
+- **`notify-send` is a hard runtime dependency** — `send()` in `_notifier.py` raises `RuntimeError` if it isn't in `PATH`. Tests must mock `shutil.which` and `subprocess.run`.
+- **Urgency values are validated** against `{"low", "normal", "critical"}` — `ValueError` for invalid urgency, `RuntimeError` for `notify-send` failures.
+- **Private helpers are prefixed with `_`** (e.g., `_notifier.py`) — they are internal to the package.
 - Python `>=3.14` is required (see `.python-version` and `pyproject.toml`).
 
 ## MCP Client Configuration
 
-Point MCP clients at `server.py` with `python3` as the command and `stdio` transport:
+After `uv tool install .`, point clients at the installed binary:
 
 ```json
-{
-  "command": "python3",
-  "args": ["./server.py"]
-}
+{ "command": "gb-mcp-notify", "args": [] }
 ```
 
-Client-specific config paths: Claude Code (`~/.claude/settings.json`), opencode (`~/.config/opencode/config.json`), VS Code Copilot (`settings.json` → `github.copilot.chat.mcp.servers`).
+Without installing, use `uv run`:
+
+```json
+{ "command": "uv", "args": ["run", "--directory", "/path/to/gb-mcp-notify", "gb-mcp-notify"] }
+```
+
+Client-specific config paths: Claude Code (`~/.claude/settings.json`), opencode (`~/.config/opencode/config.json`), Copilot CLI (`~/.copilot/mcp.json`), VS Code Copilot (`settings.json` → `github.copilot.chat.mcp.servers`).
