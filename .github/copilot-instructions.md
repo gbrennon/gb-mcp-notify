@@ -60,4 +60,4 @@ Without installing, use `uv run`:
 { "command": "uv", "args": ["run", "--directory", "/path/to/gb-mcp-notify", "gb-mcp-notify"] }
 ```
 
-Client-specific config paths: Claude Code (`~/.claude/settings.json`), opencode (`~/.config/opencode/config.json`), VS Code Copilot (`settings.json` → `github.copilot.chat.mcp.servers`).
+Client-specific config paths: Claude Code (`~/.claude/settings.json`), opencode (`~/.config/opencode/config.json`), Copilot CLI (`~/.copilot/mcp.json`), VS Code Copilot (`settings.json` → `github.copilot.chat.mcp.servers`).
